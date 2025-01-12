@@ -13,9 +13,10 @@
         public $accountUpdateDate;
         public $profilePicture;
 
-        public function __construct(){
-
+        public function __construct($userID, $email, $password){
+            $this->userID = $userID;
+            $this->email = $email;
+            $this->password = $password;
         }
-    
     }
 ?>

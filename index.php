@@ -1,8 +1,7 @@
 <?php include("connect.php");
 include("shared/classes/User.php");
 include("shared/classes/Item.php");
-
-
+include("shared/components/processIndex.php");
 ?>
 
 <!doctype html>
@@ -158,7 +157,6 @@ include("shared/classes/Item.php");
     `;
         }
     </script>
-
 </body>
 
 </html>
