@@ -1,4 +1,12 @@
 <?php
+include("Rental.php");
+
+// RENTAL STATUS CARD
+$rental = new Rental(null, null, null);
+$rentalList = $rental->getRentalsData();
+
+date_default_timezone_set('Asia/Manila');
+
 session_start();
 
 // If not logged in, redirect to login page
@@ -20,11 +28,89 @@ if (isset($_POST['btnConfirmed'])) {
     exit();
 }
 
-include("Rental.php");
+$displayItemsQuery = "SELECT items.*, attachments.*, categories.* FROM items INNER JOIN attachments ON items.itemID = attachments.itemID INNER JOIN categories ON items.categoryID = categories.categoryID WHERE items.isDeleted = 'No'";
 
-// RENTAL STATUS CARD
-$rental = new Rental(null, null, null);
-$rentalList = $rental->getRentalsData();
+if (isset($_GET['filterCategory'])) {
+    $filterCategoryID = $_GET['filterCategory'];
+
+    $displayItemsQuery .= " AND items.categoryID = '$filterCategoryID'";
+}
+
+$displayItemsResult = executeQuery($displayItemsQuery);
+
+$itemCategoryQuery = "SELECT * FROM categories";
+$itemCategoryResult = executeQuery($itemCategoryQuery);
+
+$itemConditionQuery = "SELECT * FROM conditions";
+$itemConditionResult = executeQuery($itemConditionQuery);
+
+if (isset($_POST['deleteBtn'])) {
+    $itemID = $_POST['itemID'];
+
+    $deleteItemQuery = "UPDATE items SET isDeleted = 'Yes' WHERE itemID = '$itemID'";
+    $deleteItemResult = executeQuery($deleteItemQuery);
+
+    header("Location: index.php");
+    exit();
+}
+
+if (isset($_POST['addItemBtn'])) {
+    $itemName = mysqli_real_escape_string($conn, $_POST['itemName']);
+    $itemDesc = mysqli_real_escape_string($conn, $_POST['inputDesc']);
+    $itemSpec = mysqli_real_escape_string($conn, $_POST['inputSpec']);
+    $pricePerDay = mysqli_real_escape_string($conn, $_POST['pricePerDay']);
+    $gasEmissionSaved = mysqli_real_escape_string($conn, $_POST['gasEmissionSaved']);
+    $category = mysqli_real_escape_string($conn, $_POST['selectedCategory']);
+    $itemType = mysqli_real_escape_string($conn, $_POST['inputGroupType']);
+    $itemCondition = mysqli_real_escape_string($conn, $_POST['inputGroupCondition']);
+    $itemStock = mysqli_real_escape_string($conn, $_POST['itemStock']);
+
+    $getNextIDQuery = "SHOW TABLE STATUS LIKE 'items'";
+    $getNextIDResult = executeQuery($getNextIDQuery);
+    $row = mysqli_fetch_assoc($getNextIDResult);
+
+    $insertItemQuery = "INSERT INTO `items`(`itemName`, `description`, `itemSpecifications`, `pricePerDay`, `gasEmissionSaved`, `categoryID`, `itemType`, `conditionID`, `stock`, `location`, `listingDate`, `isFeatured`, `isDeleted`) 
+    VALUES ('$itemName', '$itemDesc', '$itemSpec', '$pricePerDay', '$gasEmissionSaved', '$category', '$itemType', '$itemCondition', '$itemStock', 'Brgy. San Antonio, Sto. Tomas, Batangas', CURRENT_TIMESTAMP, 'Yes', 'No')";
+
+    $insertItemResult = executeQuery($insertItemQuery);
+
+    $itemID = $row['Auto_increment'];
+
+    uploadImage('addAttachment', $itemID, 'addItem');
+
+    header("Location: index.php#displayedItem" . $itemID);
+    exit();
+}
+
+if (isset($_POST['editItemID'])) {
+    $itemName = mysqli_real_escape_string($conn, $_POST['editName']);
+    $itemDesc = mysqli_real_escape_string($conn, $_POST['editDesc']);
+    $itemSpec = mysqli_real_escape_string($conn, $_POST['editSpec']);
+    $pricePerDay = mysqli_real_escape_string($conn, $_POST['editPrice']);
+    $gasEmissionSaved = mysqli_real_escape_string($conn, $_POST['editGas']);
+    $category = mysqli_real_escape_string($conn, $_POST['editCategory']);
+    $editType = mysqli_real_escape_string($conn, $_POST['editType']);
+    $editCondition = mysqli_real_escape_string($conn, $_POST['editCondition']);
+    $itemStock = mysqli_real_escape_string($conn, $_POST['editStock']);
+    $itemID = $_POST['editItemID'];
+
+    $updateItemsQuery = "UPDATE `items` SET `itemName` = '$itemName', `description` = '$itemDesc', `itemSpecifications` = '$itemSpec', 
+    `pricePerDay` = '$pricePerDay', `gasEmissionSaved` = '$gasEmissionSaved', `categoryID` = '$category', `itemType` = '$editType', `conditionID` = '$editCondition', `stock` = '$itemStock', `listingUpdatedDate` = CURRENT_TIMESTAMP WHERE `itemID` = '$itemID'";
+
+    $udpateItemsResult = executeQuery($updateItemsQuery);
+
+    $attachment = "editAttachment" . $itemID;
+    uploadImage($attachment, $itemID, 'editItem');
+
+    header("Location: index.php#displayedItem" . $itemID);
+    exit();
+}
+
+if (isset($_POST['cancelEdit'])) {
+    $itemID = $_POST['cancelEdit'];
+
+    header("Location: index.php#displayedItem" . $itemID);
+}
 ?>
 
 <!doctype html>
@@ -194,13 +280,26 @@ $rentalList = $rental->getRentalsData();
                     <div class="dropdown">
                         <button class="btn btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown"
                             aria-expanded="false">
-                            <span class="button-text">Filter</span>
+                            <span class="button-text" id="filterCategory">Filter</span>
                             <i class="fa fa-chevron-down"></i>
                         </button>
+
+                        <form method="GET" id="filterForm">
+                            <input type="hidden" name="filterCategory" id="inputFilter">
+                        </form>
+
                         <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#">Lorem Ipsum</a></li>
-                            <li><a class="dropdown-item" href="#">Lorem Ipsum</a></li>
-                            <li><a class="dropdown-item" href="#">Lorem Ipsum</a></li>
+                            <?php
+                            if (mysqli_num_rows($itemCategoryResult) > 0) {
+                                while ($filterCategory = mysqli_fetch_assoc($itemCategoryResult)) { ?>
+                                    <li class="dropdown-item"
+                                        onclick="updateFilterCategory('<?php echo $filterCategory['categoryName']; ?>','<?php echo $filterCategory['categoryID']; ?>');">
+                                        <?php echo $filterCategory['categoryName']; ?></li>
+                            <?php
+                                }
+                            }
+                            ?>
+                            <li><a class="dropdown-item" href="index.php">Clear</a></li>
                         </ul>
                     </div>
                     <!-- Button trigger modal -->
@@ -209,161 +308,378 @@ $rentalList = $rental->getRentalsData();
                                 class="fa fa-plus"></i><span class="button-text">Add
                                 Item</span></button>
                         <!-- Modal -->
+                        <!-- Add Item Modal -->
                         <div class="modal fade" id="staticBackdrop" data-bs-backdrop="static" data-bs-keyboard="false"
                             tabindex="-1">
                             <div class="modal-dialog add-item-modal-dialog my-3 ">
-                                <div class="modal-content">
-                                    <div class="modal-header add-item-modal">
-                                        <h1 class="modal-title fs-5 add-item-modal-text" id="staticBackdropLabel">
-                                            Add
-                                            Item</h1>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"
-                                            aria-label="Close"></button>
-                                    </div>
-                                    <div class="modal-body add-item-modal-body" id="add-item-modal-body">
-                                        <div class="container">
-                                            <div class="row">
-                                                <div class="col-12 col-md-3 add-item-frame ">
-                                                    <img src="../shared/assets/img/system/bike.jpg" alt=""
-                                                        class="img-fluid">
-                                                    <label for="customFile"
-                                                        class="btn btn-select-main-image mb-2">Select
-                                                        main image</label>
-                                                    <input type="file" class="d-none" id="customFile" />
-                                                </div>
-                                                <div class="col-12 col-md-9">
-                                                    <input type="text" class="form-control add-item-input mb-2 "
-                                                        placeholder="Item Name" />
-                                                    <textarea
-                                                        class="form-control add-item-input mb-2 add-item-textarea-desc"
-                                                        placeholder="Description"></textarea>
-                                                    <textarea
-                                                        class="form-control add-item-input add-item-textarea-specs"
-                                                        placeholder="Specifications"></textarea>
-                                                </div>
-                                            </div>
+                                <form method="POST" enctype="multipart/form-data">
+                                    <div class="modal-content">
+                                        <div class="modal-header add-item-modal">
+                                            <h1 class="modal-title fs-5 add-item-modal-text" id="staticBackdropLabel">Add
+                                                Item</h1>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body add-item-modal-body" id="add-item-modal-body">
+                                            <div class="container">
+                                                <div class="row">
+                                                    <div class="col-12 col-md-3 add-item-frame ">
+                                                        <img src="../shared/assets/img/system/bike.jpg" alt=""
+                                                            class="img-fluid" id="displayAttachment">
+                                                        <label for="customFile"
+                                                            class="btn btn-select-main-image mb-2">Select main
+                                                            image</label>
+                                                        <input type="file" class="d-none" name="addAttachment" id="customFile" accept=".png, .jpg" required />
+                                                    </div>
 
-                                            <div class="row mt-4">
-                                                <div class="col-12 col-md-4">
-                                                    <div class="mb-3">
-                                                        <label for="inputGroupRate" class="form-label">Rate
-                                                            Type</label>
-                                                        <div class="input-group mb-3">
-                                                            <span class="input-group-text rate-type-custom">₱</span>
-                                                            <input type="text" class="form-control add-item-input"
-                                                                id="inputGroupRate">
-                                                            <span class="input-group-text rate-type-custom">PER
-                                                                DAY</span>
-                                                        </div>
+                                                    <div class="col-12 col-md-9">
+                                                        <input type="text" id="addItemName" name="itemName" value="" class="form-control add-item-input mb-2"
+                                                            placeholder="Item Name" required />
+                                                        <input type="hidden" name="inputDesc" id="inputDesc" value="">
+                                                        <textarea
+                                                            class="form-control add-item-input mb-2 add-item-textarea-desc"
+                                                            placeholder="Description" id="addItemDesc" required></textarea>
+                                                        <input type="hidden" name="inputSpec" id="inputSpec" value="">
+                                                        <textarea
+                                                            class="form-control add-item-input add-item-textarea-specs"
+                                                            placeholder="Specifications" id="addItemSpec" required></textarea>
                                                     </div>
                                                 </div>
 
-                                                <div class="col-12 col-md-4">
-                                                    <div class="mb-3">
-                                                        <div class="inputGroupSelect01" data-bs-theme="dark">
-                                                            <label for="inputGroupShipping">Shipping mode</label>
-                                                            <select class="form-select mt-2 shipping-mode-custom"
-                                                                id="inputGroupShipping">
-                                                                <option selected>For Pick-up</option>
+                                                <div class="row mt-4">
+                                                    <div class="col-12 col-md-4">
+                                                        <div class="mb-3">
+                                                            <label for="inputGroupRate" class="form-label">Rate Type</label>
+                                                            <div class="input-group mb-3">
+                                                                <span class="input-group-text rate-type-custom">₱</span>
+                                                                <input type="number" step="0.01" class="form-control add-item-input" id="inputGroupRate" name="pricePerDay" value="" required>
+                                                                <span class="input-group-text rate-type-custom">PER
+                                                                    DAY</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-12 col-md-4">
+                                                        <div class="mb-3">
+                                                            <div class="inputGroupSelect01" data-bs-theme="dark">
+                                                                <label for="inputGroupShipping">Shipping mode</label>
+                                                                <select class="form-select mt-2 shipping-mode-custom"
+                                                                    id="inputGroupShipping">
+                                                                    <option selected>For Pick-up</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-12 col-md-4">
+                                                        <div class="mb-3">
+                                                            <label class="form-label" for="inputGroupC02">Potential gas
+                                                                emission
+                                                                saved</label>
+                                                            <div class="input-group mb-3">
+                                                                <input type="number" step="0.01" class="form-control add-item-input"
+                                                                    id="inputGroupC02" name="gasEmissionSaved" value="" required>
+                                                                <span class="input-group-text rate-type-custom">kg
+                                                                    CO₂</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                        <div class="modal-footer add-item-modal-footer ">
+                                            <div class="container">
+                                                <div class="row">
+                                                    <div class="col-12 col-md-3">
+                                                        <div class="inputGroupCategory" data-bs-theme="dark">
+                                                            <label for="inputGroupCategory"
+                                                                class="form-label mb-0 me-2 mt-2">Category</label>
+                                                            <select class="form-select category-custom mt-2"
+                                                                id="inputGroupCategory" name="selectedCategory" value="">
+                                                                <?php mysqli_data_seek($itemCategoryResult, 0);
+                                                                if (mysqli_num_rows($itemCategoryResult) > 0) {
+                                                                    while ($addItemCategory = mysqli_fetch_assoc($itemCategoryResult)) { ?>
+                                                                        <option value="<?php echo $addItemCategory['categoryID']; ?>"><?php echo $addItemCategory['categoryName']; ?></option>
+                                                                <?php
+                                                                    }
+                                                                } ?>
                                                             </select>
                                                         </div>
                                                     </div>
+                                                    <div class="col-12 col-md-3">
+                                                        <label for="inputGroupType"
+                                                            class="form-label mb-0 me-2 mt-2">Type</label>
+                                                        <input type="text" class="form-control add-item-input mt-2"
+                                                            id="inputGroupType" name="inputGroupType" />
+                                                    </div>
+                                                    <div class="col-12 col-md-3">
+                                                        <div class="inputGroupCondition" data-bs-theme="dark">
+                                                            <label for="inputGroupCondition"
+                                                                class="form-label mb-0 me-2 mt-2">Condition</label>
+                                                            <select class="form-select category-custom mt-2"
+                                                                id="inputGroupCondition" name="inputGroupCondition">
+                                                                <?php
+                                                                if (mysqli_num_rows($itemConditionResult) > 0) {
+                                                                    while ($condition = mysqli_fetch_assoc($itemConditionResult)) {
+                                                                ?>
+                                                                        <option value="<?php echo $condition['conditionID']; ?>"><?php echo $condition['conditionName']; ?></option>
+                                                                <?php
+                                                                    }
+                                                                }
+                                                                ?>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-12 col-md-3">
+                                                        <label for="inputGroupStocks"
+                                                            class="form-label mb-0 me-2 mt-2">Stocks</label>
+                                                        <input type="number" class="form-control add-item-input mt-2 mb-4"
+                                                            id="inputGroupStocks" name="itemStock" value="" required />
+                                                    </div>
+                                                    <div
+                                                        class="col-12 col-md-12 add-item-btn-custom d-flex justify-content-center align-items-center">
+                                                        <button type="button" class="btn btn-secondary"
+                                                            data-bs-dismiss="modal" onclick="cancelAddItem();">Cancel</button>
+                                                        <button type="submit"
+                                                            class="btn btn-primary ms-2 add-item-btn-save" name="addItemBtn" onclick="syncAddItemTextArea();">Add Item</button>
+                                                    </div>
                                                 </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        <!-- Edit Item Modal -->
+                        <?php if (mysqli_num_rows($displayItemsResult) > 0) {
+                            while ($editModalItem = mysqli_fetch_assoc($displayItemsResult)) {
+                                $imageID = htmlspecialchars($editModalItem['itemID'], ENT_QUOTES, 'UTF-8');
+                        ?>
+                                <div class="modal fade" id="staticBackdrop<?php echo $editModalItem['itemID']; ?>" data-bs-backdrop="static" data-bs-keyboard="false"
+                                    tabindex="-1">
+                                    <div class="modal-dialog add-item-modal-dialog mt-3 ">
+                                        <!-- Cancel Edit Form -->
+                                        <form method="POST" id="cancelForm<?php echo $editModalItem['itemID']; ?>">
+                                            <input type="hidden" name="cancelEdit" value="<?php echo $editModalItem['itemID']; ?>">
+                                        </form>
+                                        <!-- Edit Modal Form -->
+                                        <form method="POST" id="form<?php echo $editModalItem['itemID']; ?>" enctype="multipart/form-data" onsubmit="">
+                                            <input type="hidden" name="editItemID" value="<?php echo $editModalItem['itemID']; ?>">
+                                            <div class="modal-content">
+                                                <div class="modal-header add-item-modal">
+                                                    <h1 class="modal-title fs-5 add-item-modal-text" id="staticBackdropLabel<?php echo $editModalItem['itemID']; ?>">Edit
+                                                        Item</h1>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                                        aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body add-item-modal-body" id="add-item-modal-body<?php echo $editModalItem['itemID']; ?>">
+                                                    <div class="container">
+                                                        <div class="row">
+                                                            <div class="col-12 col-md-3 add-item-frame ">
+                                                                <img src="../shared/assets/img/system/items/<?php echo $editModalItem['fileName']; ?>" alt=""
+                                                                    class="img-fluid" id="imgContainer<?php echo $editModalItem['itemID']; ?>">
+                                                                <label for="customFile<?php echo $editModalItem['itemID']; ?>"
+                                                                    class="btn btn-primary btn-select-main-image mb-2">Select main
+                                                                    image</label>
+                                                                <input type="file" class="d-none" name="editAttachment<?php echo $editModalItem['itemID']; ?>" id="customFile<?php echo $editModalItem['itemID']; ?>" accept=".png, .jpg" required />
+                                                            </div>
 
-                                                <div class="col-12 col-md-4">
-                                                    <div class="mb-3">
-                                                        <label class="form-label" for="inputGroupC02">Potential gas
-                                                            emission
-                                                            saved</label>
-                                                        <div class="input-group mb-3">
-                                                            <input type="text" class="form-control add-item-input"
-                                                                id="inputGroupC02">
-                                                            <span class="input-group-text rate-type-custom">kg
-                                                                CO₂</span>
+                                                            <div class="col-12 col-md-9">
+                                                                <input type="text" class="form-control add-item-input mb-2 "
+                                                                    placeholder="Item Name" name="editName" value="<?php echo $editModalItem['itemName']; ?>" />
+                                                                <textarea
+                                                                    class="form-control add-item-input mb-2 add-item-textarea-desc"
+                                                                    placeholder="Description" name="editDesc" required><?php echo $editModalItem['description']; ?></textarea>
+                                                                <textarea
+                                                                    class="form-control add-item-input add-item-textarea-specs"
+                                                                    placeholder="Specifications" name="editSpec" required><?php echo $editModalItem['itemSpecifications']; ?></textarea>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="row mt-4">
+                                                            <div class="col-12 col-md-4">
+                                                                <div class="mb-3">
+                                                                    <label for="inputGroupRate<?php echo $editModalItem['itemID']; ?>" class="form-label">Rate Type</label>
+                                                                    <div class="input-group mb-3">
+                                                                        <span class="input-group-text rate-type-custom">₱</span>
+                                                                        <input type="number" step="0.01" class="form-control add-item-input" id="inputGroupRate<?php echo $editModalItem['itemID']; ?>" name="editPrice" value="<?php echo $editModalItem['pricePerDay']; ?>" required>
+                                                                        <span class="input-group-text rate-type-custom">PER
+                                                                            DAY</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="col-12 col-md-4">
+                                                                <div class="mb-3">
+                                                                    <div class="inputGroupSelect01" data-bs-theme="dark">
+                                                                        <label for="inputGroupShipping<?php echo $editModalItem['itemID']; ?>">Shipping mode</label>
+                                                                        <select class="form-select mt-2 shipping-mode-custom"
+                                                                            id="inputGroupShipping<?php echo $editModalItem['itemID']; ?>">
+                                                                            <option selected>For Pick-up</option>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="col-12 col-md-4">
+                                                                <div class="mb-3">
+                                                                    <label class="form-label" for="inputGroupC02">Potential gas
+                                                                        emission
+                                                                        saved</label>
+                                                                    <div class="input-group mb-3">
+                                                                        <input type="number" step="0.01" class="form-control add-item-input"
+                                                                            id="inputGroupC02" name="editGas" value="<?php echo $editModalItem['gasEmissionSaved']; ?>" required>
+                                                                        <span class="input-group-text rate-type-custom">kg
+                                                                            CO₂</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+                                                <div class="modal-footer add-item-modal-footer ">
+                                                    <div class="container">
+                                                        <div class="row">
+                                                            <div class="col-12 col-md-3">
+                                                                <div class="inputGroupCategory" data-bs-theme="dark">
+                                                                    <label for="inputGroupCategory<?php echo $editModalItem['itemID']; ?>"
+                                                                        class="form-label mb-0 me-2 mt-2">Category</label>
+                                                                    <select class="form-select category-custom mt-2"
+                                                                        id="inputGroupCategory<?php echo $editModalItem['itemID']; ?>" name="editCategory" value="<?php echo $editModalItem['categoryName']; ?>">
+                                                                        <?php if (mysqli_num_rows($itemCategoryResult) > 0) {
+                                                                            mysqli_data_seek($itemCategoryResult, 0);
+                                                                            while ($editItemCategory = mysqli_fetch_assoc($itemCategoryResult)) {
+                                                                        ?>
+                                                                                <option <?php echo ($editModalItem['categoryID'] == $editItemCategory['categoryID']) ? 'selected' : ''; ?> value="<?php echo $editItemCategory['categoryID']; ?>"><?php echo $editItemCategory['categoryName']; ?></option>
+                                                                        <?php
+                                                                            }
+                                                                        } ?>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-12 col-md-3">
+                                                                <label for="inputGroupType<?php echo $editModalItem['itemID']; ?>"
+                                                                    class="form-label mb-0 me-2 mt-2">Type</label>
+                                                                <input type="text" class="form-control add-item-input mt-2"
+                                                                    id="inputGroupType<?php echo $editModalItem['itemID']; ?>" name="editType" value="<?php echo $editModalItem['itemType']; ?>" />
+                                                            </div>
+                                                            <div class="col-12 col-md-3">
+                                                                <div class="inputGroupCondition" data-bs-theme="dark">
+                                                                    <label for="inputGroupCondition<?php echo $editModalItem['itemID']; ?>"
+                                                                        class="form-label mb-0 me-2 mt-2">Condition</label>
+                                                                    <select class="form-select category-custom mt-2"
+                                                                        id="inputGroupCondition<?php echo $editModalItem['itemID']; ?>" name="editCondition">
+                                                                        <?php mysqli_data_seek($itemConditionResult, 0);
+                                                                        if (mysqli_num_rows($itemConditionResult) > 0) {
+                                                                            while ($editCondition = mysqli_fetch_assoc($itemConditionResult)) {
+                                                                        ?>
+                                                                                <option <?php echo $editModalItem['conditionID'] == $editCondition['conditionID'] ? 'selected' : ''; ?> value="<?php echo $editCondition['conditionID']; ?>"><?php echo $editCondition['conditionName']; ?></option>
+                                                                        <?php
+                                                                            }
+                                                                        }
+                                                                        ?>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-12 col-md-3">
+                                                                <label for="inputGroupStocks<?php echo $editModalItem['itemID']; ?>"
+                                                                    class="form-label mb-0 me-2 mt-2">Stocks</label>
+                                                                <input type="number" class="form-control add-item-input mt-2 mb-4"
+                                                                    id="inputGroupStocks<?php echo $editModalItem['itemID']; ?>" name="editStock" value="<?php echo $editModalItem['stock']; ?>" required />
+                                                            </div>
+                                                            <div
+                                                                class="col-12 col-md-12 add-item-btn-custom d-flex justify-content-center align-items-center">
+                                                                <button type="button" class="btn btn-secondary"
+                                                                    data-bs-dismiss="modal" onclick="document.getElementById('cancelForm<?php echo $editModalItem['itemID']; ?>').submit(); ">Cancel</button>
+                                                                <button type="button"
+                                                                    class="btn btn-primary ms-2 add-item-btn-save" onclick="document.getElementById('form<?php echo $editModalItem['itemID']; ?>').submit();">Save
+                                                                    Changes</button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-
-                                    </div>
-                                    <div class="modal-footer add-item-modal-footer ">
-                                        <div class="container">
-                                            <div class="row">
-                                                <div class="col-12 col-md-3">
-                                                    <div class="inputGroupCategory" data-bs-theme="dark">
-                                                        <label for="inputGroupCategory"
-                                                            class="form-label mb-0 me-2 mt-2">Category</label>
-                                                        <select class="form-select category-custom mt-2"
-                                                            id="inputGroupCategory">
-                                                            <option selected>Transportation</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div class="col-12 col-md-3">
-                                                    <label for="inputGroupType"
-                                                        class="form-label mb-0 me-2 mt-2">Type</label>
-                                                    <input type="text" class="form-control add-item-input mt-2"
-                                                        id="inputGroupType" />
-                                                </div>
-                                                <div class="col-12 col-md-3">
-                                                    <div class="inputGroupCondition" data-bs-theme="dark">
-                                                        <label for="inputGroupCondition"
-                                                            class="form-label mb-0 me-2 mt-2">Condition</label>
-                                                        <select class="form-select category-custom mt-2"
-                                                            id="inputGroupCondition">
-                                                            <option selected>Very Good</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div class="col-12 col-md-3">
-                                                    <label for="inputGroupStocks"
-                                                        class="form-label mb-0 me-2 mt-2">Stocks</label>
-                                                    <input type="text" class="form-control add-item-input mt-2 mb-4"
-                                                        id="inputGroupStocks" />
-                                                </div>
-                                                <div
-                                                    class="col-12 col-md-12 add-item-btn-custom d-flex justify-content-center align-items-center">
-                                                    <button type="button" class="btn btn-secondary"
-                                                        data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="button" class="btn ms-2 add-item-btn-save">Save
-                                                        Changes</button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        </form>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
+                        <?php
+                                echo "<script>
+                            const displayAttachment{$imageID} = document.getElementById('imgContainer{$imageID}');
+                            const customFile{$imageID} = document.getElementById('customFile{$imageID}');
+                
+                                customFile{$imageID}.addEventListener('change', (event) => {
+                                    if (event?.target?.files && event.target.files[0]) {
+                                        displayAttachment{$imageID}.src = URL.createObjectURL(event.target.files[0]);
+                                        displayAttachment{$imageID}.load();
+                                    } 
+                                });
+                            </script>";
+                            }
+                        } ?>
 
                     </div>
                 </div>
             </div>
+
             <div class="content mt-5">
                 <!-- CONTENTS -->
                 <div class="container-fluid">
                     <div class="row">
                         <div class="manage-listings">
-                            <div class="card-body-listings p-3">
-                                <div class="listings-content">
-                                    <div class="order-content">
-                                        <img src="../shared/assets/img/system/bike.jpg" alt="" class="img-fluid">
-                                        <div class="listings-info">
-                                            <h4>TrailMaster X200 Mountain Bike</h4>
-                                            <h5>Available stocks: 21</h5>
-                                        </div>
-                                    </div>
-                                    <div class="listings-buttons">
-                                        <button class="btn btn-delete"><i class="fa fa-trash-can"></i></button>
-                                        <button class="btn btn-edit"><i class="fa fa-pen-to-square"></i></button>
-                                    </div>
-                                </div>
-                            </div>
+                            <h3>Filter By:
+                                <span id="filterCategoryName">
+                                    <?php
+                                    if (isset($_GET['filterCategory'])) {
+                                        $selectedCategoryID = $_GET['filterCategory'];
+                                        $categoryQuery = "SELECT categoryName FROM categories WHERE categoryID = '$selectedCategoryID'";
+                                        $categoryResult = executeQuery($categoryQuery);
+                                        if (mysqli_num_rows($categoryResult) > 0) {
+                                            $category = mysqli_fetch_assoc($categoryResult);
+                                            echo " " . $category['categoryName'];
+                                        }
+                                    }
+                                    ?>
+                                </span>
+                            </h3>
+                            <!-- Generate With PHP -->
+                            <?php mysqli_data_seek($displayItemsResult, 0);
+                            if (mysqli_num_rows($displayItemsResult)) {
+                                while ($items = mysqli_fetch_assoc($displayItemsResult)) { ?>
+                                    <form method="POST">
+                                        <div class="card-body-listings p-3">
+                                            <div class="listings-content">
+                                                <div class="order-content" id="displayedItem<?php echo $items['itemID']; ?>">
+                                                    <img src="../shared/assets/img/system/items/<?php echo $items['fileName']; ?>" alt="" class="img-fluid">
+                                                    <div class="listings-info">
+                                                        <input type="hidden" name="itemID" value="<?php echo $items['itemID'] ?>">
+                                                        <h4><?php echo $items['itemName']; ?></h4>
+                                                        <h5>Available stocks: <?php echo $items['stock']; ?></h5>
+                                                    </div>
+                                                </div>
+                                                <div class="listings-buttons">
+                                                    <button type="submit" name="deleteBtn" class="btn btn-delete"><i class="fa fa-trash-can"></i></button>
+                                    </form>
+                                    <button type="button" class="btn btn-edit" data-bs-toggle="modal" data-bs-target="#staticBackdrop<?php echo $items['itemID']; ?>"><i class="fa fa-pen-to-square"></i></button>
                         </div>
                     </div>
                 </div>
+            <?php
+                                }
+                            } else {
+            ?>
+            <div class="text-center mt-5">
+                <h1>No Items</h1>
+            </div>
+        <?php
+                            }
+        ?>
             </div>
         </div>
+    </div>
+    </div>
+    </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
@@ -419,11 +735,45 @@ $rentalList = $rental->getRentalsData();
             });
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", function() {
             var savedSection = localStorage.getItem("activeSection") || "btn1";
             showContent(savedSection);
         });
 
+        function cancelAddItem() {
+            document.getElementById('addItemName').value = "";
+            document.getElementById('addItemDesc').value = "";
+            document.getElementById('addItemSpec').value = "";
+            document.getElementById('inputGroupRate').value = "";
+            document.getElementById('inputGroupC02').value = "";
+            document.getElementById('inputGroupStocks').value = "";
+            document.getElementById('attachment').value = "";
+        }
+
+        function syncAddItemTextArea() {
+            document.getElementById('inputDesc').value = document.getElementById('addItemDesc').value;
+            document.getElementById('inputSpec').value = document.getElementById('addItemSpec').value;
+        }
+
+        function syncEditItemTextArea() {
+            document.getElementById('inputDesc').value = document.getElementById('addItemDesc').value;
+            document.getElementById('inputSpec').value = document.getElementById('addItemSpec').value;
+        }
+
+        function updateFilterCategory(categoryName, categoryID) {
+            document.getElementById('inputFilter').value = categoryID;
+            document.getElementById('filterForm').submit();
+        }
+
+        const displayAttachment = document.getElementById('displayAttachment');
+        const customFile = document.getElementById('customFile');
+
+        customFile.addEventListener('change', (event) => {
+            if (event?.target?.files && event.target.files[0]) {
+                displayAttachment.src = URL.createObjectURL(event.target.files[0]);
+                displayAttachment.load();
+            }
+        });
     </script>
 
 </body>

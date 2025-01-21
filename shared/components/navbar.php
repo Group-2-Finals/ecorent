@@ -18,7 +18,7 @@ $categoryResult = executeQuery($categoryQuery);
 if (isset($_GET['setCategory'])) {
     $chosenCategory = $_GET['setCategory'];
 
-    $loadItemsQuery = "SELECT * FROM items WHERE categoryID = '$chosenCategory'";
+    $loadItemsQuery = "SELECT items.*, attachments.*, categories.* FROM items INNER JOIN attachments ON items.itemID = attachments.itemID INNER JOIN categories ON items.categoryID = categories.categoryID WHERE items.categoryID = '$chosenCategory' AND items.isDeleted ='No'";
 
     if ($searchCondition) {
         $loadItemsQuery .= " AND $searchCondition";
@@ -29,10 +29,10 @@ if (isset($_GET['setCategory'])) {
         exit();
     }
 } else {
-    $loadItemsQuery = "SELECT * FROM items";
+    $loadItemsQuery = "SELECT items.*, attachments.*, categories.* FROM items INNER JOIN attachments ON items.itemID = attachments.itemID INNER JOIN categories ON items.categoryID = categories.categoryID WHERE items.isDeleted = 'No'";
 
     if ($searchCondition) {
-        $loadItemsQuery .= " WHERE $searchCondition";
+        $loadItemsQuery .= " AND $searchCondition";
     }
 }
 
@@ -41,20 +41,20 @@ if (isset($_GET['applyFilter'])) {
         $selectedCategories = $_GET['itemFilter'];
         $categoriesList = implode(",", $selectedCategories);
 
-        $loadItemsQuery .= " WHERE categoryID IN ($categoriesList)";
+        $loadItemsQuery .= " AND items.categoryID IN ($categoriesList)";
 
         if (!empty($_GET['min']) && !empty($_GET['max'])) {
-            $minPrice = (int) $_GET['min'];
-            $maxPrice = (int) $_GET['max'];
-            $loadItemsQuery .= " AND pricePerDay BETWEEN $minPrice AND $maxPrice";
+            $minPrice = (int)$_GET['min'];
+            $maxPrice = (int)$_GET['max'];
+            $loadItemsQuery .= " AND items.pricePerDay BETWEEN $minPrice AND $maxPrice";
         }
     } else {
         if (!empty($_GET['min']) && !empty($_GET['max'])) {
-            $minPrice = (int) $_GET['min'];
-            $maxPrice = (int) $_GET['max'];
-            $loadItemsQuery = "SELECT * FROM items WHERE pricePerDay BETWEEN $minPrice AND $maxPrice";
+            $minPrice = (int)$_GET['min'];
+            $maxPrice = (int)$_GET['max'];
+            $loadItemsQuery = "SELECT items.*, attachments.*, categories.* FROM items INNER JOIN attachments ON items.itemID = attachments.itemID INNER JOIN categories ON items.categoryID = categories.categoryID WHERE items.isDeleted = 'No' AND items.pricePerDay BETWEEN $minPrice AND $maxPrice";
         } else {
-            $loadItemsQuery = "SELECT * FROM items";
+            $loadItemsQuery = "SELECT items.*, attachments.*, categories.* FROM items INNER JOIN attachments ON items.itemID = attachments.itemID INNER JOIN categories ON items.categoryID = categories.categoryID WHERE items.isDeleted = 'No'";
         }
     }
 
@@ -115,7 +115,7 @@ $loadItemsResult = executeQuery($loadItemsQuery);
                                 </button>
                             </li>
                         </form>
-                        <?php
+                <?php
                     }
                 }
                 ?>

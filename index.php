@@ -61,7 +61,7 @@ include("shared/processes/process-index.php");
     <section class="container my-3">
         <div class="row justify-content-between g-3">
 
-            <a href="listings.php" class="col-12 col-sm-6 col-md-4 col-lg-auto">
+            <a href="listings.php?setCategory=1" class="col-12 col-sm-6 col-md-4 col-lg-auto">
                 <div class="d-flex align-items-center p-3 rounded-pill" style="background-color: #343333;">
                     <img src="shared/assets/img/system/photography.png" class="img-fluid me-2"
                         style="width: 55px; height: auto;">
@@ -69,7 +69,7 @@ include("shared/processes/process-index.php");
                 </div>
             </a>
 
-            <a href="listings.php" class="col-12 col-sm-6 col-md-4 col-lg-auto">
+            <a href="listings.php?setCategory=2" class="col-12 col-sm-6 col-md-4 col-lg-auto">
                 <div class="d-flex align-items-center p-3 rounded-pill" style="background-color: #343333;">
                     <img src="shared/assets/img/system/transportation.png" class="img-fluid me-2"
                         style="width: 55px; height: auto;">
@@ -77,7 +77,7 @@ include("shared/processes/process-index.php");
                 </div>
             </a>
 
-            <a href="listings.php" class="col-12 col-sm-6 col-md-4 col-lg-2">
+            <a href="listings.php?setCategory=3" class="col-12 col-sm-6 col-md-4 col-lg-2">
                 <div class="d-flex align-items-center p-3 rounded-pill" style="background-color: #343333;">
                     <img src="shared/assets/img/system/clothing.png" class="img-fluid me-2"
                         style="width: 55px; height: auto;">
@@ -85,7 +85,7 @@ include("shared/processes/process-index.php");
                 </div>
             </a>
 
-            <a href="listings.php" class="col-12 col-sm-6 col-md-6 col-lg-2">
+            <a href="listings.php?setCategory=1" class="col-12 col-sm-6 col-md-6 col-lg-2">
                 <div class="d-flex align-items-center p-3 rounded-pill" style="background-color: #343333;">
                     <img src="shared/assets/img/system/gadgets.png" class="img-fluid me-2"
                         style="width: 55px; height: auto;">
@@ -93,7 +93,7 @@ include("shared/processes/process-index.php");
                 </div>
             </a>
 
-            <a href="listings.php" class="col-12 col-sm-6 col-md-6 col-lg-2">
+            <a href="listings.php?setCategory=4" class="col-12 col-sm-6 col-md-6 col-lg-2">
                 <div class="d-flex align-items-center p-3 rounded-pill" style="background-color: #343333;">
                     <img src="shared/assets/img/system/outdoor.png" class="img-fluid me-2"
                         style="width: 55px; height: auto;">
